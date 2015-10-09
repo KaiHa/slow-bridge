@@ -34,7 +34,7 @@ handlers = do
   where
     getNICs :: IO [String]
     getNICs = do
-        ls <- readProcess "/bin/ip" ["link"] ""
+        ls <- readProcess "ip" ["link"] ""
         let nics = [strip x | x <- lines ls, isDigit $ head x]
         return [x | x <- nics, x /= "lo" && take 3 x /= "vir"]
         where strip = takeWhile (/= ':') . drop 2 . dropWhile (/= ':')
@@ -121,10 +121,10 @@ netem ns = msum [ viewNetem, updateNetem ]
                         ]
              seeOther ("/netem" :: String) (toResponse ())
           where
-            ipLink a = void $ readProcess "/bin/ip" ("link":a) ""
+            ipLink a = void $ readProcess "ip" ("link":a) ""
             tc n d r = tc' ["qdisc", "replace", "dev", n, "root", "netem"
                            , "delay", d, "rate", r]
-              where tc' a = void $ readProcess "/sbin/tc" a ""
+              where tc' a = void $ readProcess "tc" a ""
             updateBridge nic1 nic2 = do
               b <- find ("brSlow" `isPrefixOf`) <$> lines <$> brctl ["show"]
               when (isDeleteNeeded b) deleteBridge
@@ -145,4 +145,4 @@ netem ns = msum [ viewNetem, updateNetem ]
                                    ipLink ["set", "up", "dev", nic1]
                                    ipLink ["set", "up", "dev", nic2]
                                    ipLink ["set", "up", "dev", "brSlow"]
-                brctl a = readProcess "/sbin/brctl" a ""
+                brctl a = readProcess "brctl" a ""
