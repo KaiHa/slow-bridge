@@ -37,7 +37,7 @@ handlers = do
   where
     getNICs :: IO [Nic]
     getNICs = do
-        ls <- readProcess "ip" ["link"] ""
+        ls <- ip ["link"]
         let nics = [strip x | x <- lines ls, isDigit $ head x]
         return [Nic x | x <- nics, x /= "lo" && take 3 x /= "vir"]
         where strip = takeWhile (/= ':') . drop 2 . dropWhile (/= ':')
@@ -62,6 +62,8 @@ viewNetem ns = do
     rate2  <- optional $ lookCookieValue "rate2"
     delay1 <- optional $ lookCookieValue "delay1"
     delay2 <- optional $ lookCookieValue "delay2"
+    lsBr   <- liftIO $ brctl ["show"]
+    lsTc   <- liftIO $ tc ["qdisc"]
     ok $ template "Network Emulator" $ do
        H.h1 "Network Emulator"
        form ! action "/netem" ! enctype "multipart/form-data" ! A.method "POST" $ do
@@ -78,6 +80,9 @@ viewNetem ns = do
                     label " Delay: "
                     H.select ! name "new_delay1" ! ralign $ delays delay1
            H.p $ input ! type_ "submit" ! value "Apply"
+           textarea "brctl show:" lsBr "5"
+           textarea "tc qdisc:"   lsTc "10"
+           return ()
   where
     rates def  = do toOpt def   "32kbit"
                     toOpt def   "64kbit"
@@ -92,6 +97,13 @@ viewNetem ns = do
                     toOpt def "640ms"
     nics def = mapM_ (toOpt def . unNic) ns
     ralign = A.style "text-align:right"
+    textarea caption text n =
+        H.section $ do
+            H.h1 caption
+            H.p $ H.textarea (H.toHtml text)
+                   ! A.rows n
+                   ! A.cols "100"
+                   ! A.readonly "readonly"
     toOpt :: Maybe String -> String -> Html
     toOpt def v = (if Just v == def then (! A.selected "") else id)
                   $ H.option (toHtml v) ! value (toValue v)
@@ -112,8 +124,8 @@ updateNetem = do
     delay1 <- unpack <$> lookText "new_delay1"
     delay2 <- unpack <$> lookText "new_delay2"
     liftIO $ updateBridge nic1 nic2
-    liftIO $ tc nic1 delay1 rate1
-    liftIO $ tc nic2 delay2 rate2
+    liftIO $ tc' nic1 delay1 rate1
+    liftIO $ tc' nic2 delay2 rate2
     addCookies [ (Session, mkCookie "nic1"   nic1)
                , (Session, mkCookie "nic2"   nic2)
                , (Session, mkCookie "rate1"  rate1)
@@ -123,12 +135,10 @@ updateNetem = do
                ]
     seeOther ("/netem" :: String) (toResponse ())
   where
-    ipLink a = void $ readProcess "ip" ("link":a) ""
-    tc n d r =
-        tc' ["qdisc", "replace", "dev", n, "root", "netem"
-            , "delay", d, "rate", r]
-      where
-        tc' a = void $ readProcess "tc" a ""
+    ipLink a = void $ ip ("link":a)
+    tc' n d r =
+        void $ tc ["qdisc", "replace", "dev", n, "root", "netem"
+                  , "delay", d, "rate", r]
     updateBridge nic1 nic2 = do
         b <- find ("brSlow" `isPrefixOf`) <$> lines <$> brctl ["show"]
         when (isDeleteNeeded b) deleteBridge
@@ -149,4 +159,13 @@ updateNetem = do
                            ipLink ["set", "up", "dev", nic1]
                            ipLink ["set", "up", "dev", nic2]
                            ipLink ["set", "up", "dev", "brSlow"]
-        brctl a = readProcess "brctl" a ""
+
+
+brctl :: [String] -> IO String
+brctl a = readProcess "brctl" a ""
+
+ip :: [String] -> IO String
+ip a = readProcess "ip" a ""
+
+tc :: [String] -> IO String
+tc a = readProcess "tc" a ""
