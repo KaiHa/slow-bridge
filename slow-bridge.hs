@@ -44,12 +44,9 @@ handlers = do
 
 
 template :: Text -> Html -> Response
-template title body = toResponse $
-  H.html $ do
-    H.head $ do
-      H.title (toHtml title)
-    H.body $ do
-      body
+template title body = toResponse $ H.html $ do
+    H.head $ H.title (toHtml title)
+    H.body body
 
 
 netem :: [Nic] -> ServerPart Response
@@ -96,11 +93,11 @@ viewNetem ns = do
     nics def = mapM_ (toOpt def . unNic) ns
     ralign = A.style "text-align:right"
     toOpt :: Maybe String -> String -> Html
-    toOpt def v = (if (Just v == def) then (! A.selected "") else id)
+    toOpt def v = (if Just v == def then (! A.selected "") else id)
                   $ H.option (toHtml v) ! value (toValue v)
-    fromTo a b = do "From "
+    fromTo a b = do _ <- "From "
                     H.b $ toHtml $ fromMaybe "A" a
-                    " to "
+                    _ <- " to "
                     H.b $ toHtml $ fromMaybe "B" b
                     ": "
 
