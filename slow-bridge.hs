@@ -19,10 +19,10 @@ import qualified Text.Blaze.Html5.Attributes as A
 
 main :: IO ()
 main = do
-       putStrLn "Open http://localhost:8000/netem in a browser"
-       simpleHTTP nullConf $ do
-           decodeBody (defaultBodyPolicy "/tmp/" 4096 4096 4096)
-           handlers
+    putStrLn "Open http://localhost:8000/netem in a browser"
+    simpleHTTP nullConf $ do
+        decodeBody (defaultBodyPolicy "/tmp/" 4096 4096 4096)
+        handlers
 
 
 newtype Nic = Nic {unNic :: String}
@@ -30,10 +30,10 @@ newtype Nic = Nic {unNic :: String}
 
 handlers :: ServerPart Response
 handlers = do
-  nics <- liftIO getNICs
-  msum [ dir "netem" $ netem nics
-       , seeOther ("/netem" :: String) $ toResponse ()
-       ]
+    nics <- liftIO getNICs
+    msum [ dir "netem" $ netem nics
+         , seeOther ("/netem" :: String) $ toResponse ()
+         ]
   where
     getNICs :: IO [Nic]
     getNICs = do
@@ -106,48 +106,50 @@ viewNetem ns = do
 
 
 updateNetem :: ServerPart Response
-updateNetem =
-    do method POST
-       nic1   <- unpack <$> lookText "new_nic1"
-       nic2   <- unpack <$> lookText "new_nic2"
-       rate1  <- unpack <$> lookText "new_rate1"
-       rate2  <- unpack <$> lookText "new_rate2"
-       delay1 <- unpack <$> lookText "new_delay1"
-       delay2 <- unpack <$> lookText "new_delay2"
-       liftIO $ updateBridge nic1 nic2
-       liftIO $ tc nic1 delay1 rate1
-       liftIO $ tc nic2 delay2 rate2
-       addCookies [ (Session, mkCookie "nic1"   nic1)
-                  , (Session, mkCookie "nic2"   nic2)
-                  , (Session, mkCookie "rate1"  rate1)
-                  , (Session, mkCookie "rate2"  rate2)
-                  , (Session, mkCookie "delay1" delay1)
-                  , (Session, mkCookie "delay2" delay2)
-                  ]
-       seeOther ("/netem" :: String) (toResponse ())
-    where
-      ipLink a = void $ readProcess "ip" ("link":a) ""
-      tc n d r = tc' ["qdisc", "replace", "dev", n, "root", "netem"
-                     , "delay", d, "rate", r]
-        where tc' a = void $ readProcess "tc" a ""
-      updateBridge nic1 nic2 = do
+updateNetem = do
+    method POST
+    nic1   <- unpack <$> lookText "new_nic1"
+    nic2   <- unpack <$> lookText "new_nic2"
+    rate1  <- unpack <$> lookText "new_rate1"
+    rate2  <- unpack <$> lookText "new_rate2"
+    delay1 <- unpack <$> lookText "new_delay1"
+    delay2 <- unpack <$> lookText "new_delay2"
+    liftIO $ updateBridge nic1 nic2
+    liftIO $ tc nic1 delay1 rate1
+    liftIO $ tc nic2 delay2 rate2
+    addCookies [ (Session, mkCookie "nic1"   nic1)
+               , (Session, mkCookie "nic2"   nic2)
+               , (Session, mkCookie "rate1"  rate1)
+               , (Session, mkCookie "rate2"  rate2)
+               , (Session, mkCookie "delay1" delay1)
+               , (Session, mkCookie "delay2" delay2)
+               ]
+    seeOther ("/netem" :: String) (toResponse ())
+  where
+    ipLink a = void $ readProcess "ip" ("link":a) ""
+    tc n d r =
+        tc' ["qdisc", "replace", "dev", n, "root", "netem"
+            , "delay", d, "rate", r]
+      where
+        tc' a = void $ readProcess "tc" a ""
+    updateBridge nic1 nic2 = do
         b <- find ("brSlow" `isPrefixOf`) <$> lines <$> brctl ["show"]
         when (isDeleteNeeded b) deleteBridge
         when (isUpdateNeeded b) updateBridge'
-        where
-          isUpdateNeeded Nothing  = True
-          isUpdateNeeded (Just b) | not (nic1 `isInfixOf` b) = True
-                                  | not (nic2 `isInfixOf` b) = True
-                                  | otherwise                = False
-          isDeleteNeeded Nothing  = False
-          isDeleteNeeded b        = isUpdateNeeded b
-          deleteBridge  = do ipLink ["set", "down", "dev", "brSlow"]
-                             void $ brctl ["delbr", "brSlow"]
-          updateBridge' = do void $ brctl ["addbr", "brSlow"]
-                             void $ brctl ["setfd", "brSlow", "0"]
-                             void $ brctl ["addif", "brSlow", nic1]
-                             void $ brctl ["addif", "brSlow", nic2]
-                             ipLink ["set", "up", "dev", nic1]
-                             ipLink ["set", "up", "dev", nic2]
-                             ipLink ["set", "up", "dev", "brSlow"]
-          brctl a = readProcess "brctl" a ""
+      where
+        isUpdateNeeded Nothing  = True
+        isUpdateNeeded (Just b) | not (nic1 `isInfixOf` b) = True
+                                | not (nic2 `isInfixOf` b) = True
+                                | otherwise                = False
+        isDeleteNeeded Nothing  = False
+        isDeleteNeeded b        = isUpdateNeeded b
+        deleteBridge  = do ipLink ["set", "down", "dev", "brSlow"]
+                           void $ brctl ["delbr", "brSlow"]
+        updateBridge' = do void $ brctl ["addbr", "brSlow"]
+                           void $ brctl ["setfd", "brSlow", "0"]
+                           void $ brctl ["addif", "brSlow", nic1]
+                           void $ brctl ["addif", "brSlow", nic2]
+                           ipLink ["set", "up", "dev", nic1]
+                           ipLink ["set", "up", "dev", nic2]
+                           ipLink ["set", "up", "dev", "brSlow"]
+        brctl a = readProcess "brctl" a ""
