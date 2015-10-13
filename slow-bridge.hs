@@ -103,6 +103,7 @@ viewNetem ns = do
                    ! A.rows n
                    ! A.cols "100"
                    ! A.readonly "readonly"
+                   ! A.style "font-family:monospace"
     toOpt :: Maybe String -> String -> Html
     toOpt def v = (if Just v == def then (! A.selected "") else id)
                   $ H.option (toHtml v) ! value (toValue v)
