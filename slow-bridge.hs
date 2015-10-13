@@ -80,9 +80,8 @@ viewNetem ns = do
                     label " Delay: "
                     H.select ! name "new_delay1" ! ralign $ delays delay1
            H.p $ input ! type_ "submit" ! value "Apply"
-           textarea "brctl show:" lsBr "5"
-           textarea "tc qdisc:"   lsTc "10"
-           return ()
+       textarea "brctl show:" lsBr "5"
+       textarea "tc qdisc:"   lsTc "12"
   where
     rates def  = do toOpt def   "32kbit"
                     toOpt def   "64kbit"
