@@ -8,7 +8,6 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Char (isDigit)
 import Data.List (find, isInfixOf, isPrefixOf)
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
 import Data.Text.Lazy (unpack)
 import Happstack.Server hiding (body)
 import System.Process (readProcess)
@@ -43,12 +42,6 @@ handlers = do
         where strip = takeWhile (/= ':') . drop 2 . dropWhile (/= ':')
 
 
-template :: Text -> Html -> Response
-template title body = toResponse $ H.html $ do
-    H.head $ H.title (toHtml title)
-    H.body body
-
-
 netem :: [Nic] -> ServerPart Response
 netem ns = msum [viewNetem ns, updateNetem]
 
@@ -64,24 +57,26 @@ viewNetem ns = do
     delay2 <- optional $ lookCookieValue "delay2"
     lsBr   <- liftIO $ brctl ["show"]
     lsTc   <- liftIO $ tc ["qdisc"]
-    ok $ template "Network Emulator" $ do
-       H.h1 "Network Emulator"
-       form ! action "/netem" ! enctype "multipart/form-data" ! A.method "POST" $ do
-           H.p $ do label ! A.for "nics" $ "Select the network interface cards to bridge: "
-                    H.select ! name "new_nic1" $ nics nic1
-                    label " <-> "
-                    H.select ! name "new_nic2" $ nics nic2
-           H.p $ do label ! A.for "rate2" $ fromTo nic1 nic2
-                    H.select ! name "new_rate2"  ! ralign $ rates rate2
-                    label " Delay: "
-                    H.select ! name "new_delay2" ! ralign $ delays delay2
-           H.p $ do label ! A.for "rate1" $ fromTo nic2 nic1
-                    H.select ! name "new_rate1"  ! ralign $ rates rate1
-                    label " Delay: "
-                    H.select ! name "new_delay1" ! ralign $ delays delay1
-           H.p $ input ! type_ "submit" ! value "Apply"
-       textarea "brctl show:" lsBr "5"
-       textarea "tc qdisc:"   lsTc "12"
+    ok $ toResponse $ H.html $ do
+        H.head $ H.title "Network Emulator"
+        H.body $ do
+            H.h1 "Network Emulator"
+            form ! action "/netem" ! enctype "multipart/form-data" ! A.method "POST" $ do
+                H.p $ do label ! A.for "nics" $ "Select the network interface cards to bridge: "
+                         H.select ! name "new_nic1" $ nics nic1
+                         label " <-> "
+                         H.select ! name "new_nic2" $ nics nic2
+                H.p $ do label ! A.for "rate2" $ fromTo nic1 nic2
+                         H.select ! name "new_rate2"  ! ralign $ rates rate2
+                         label " Delay: "
+                         H.select ! name "new_delay2" ! ralign $ delays delay2
+                H.p $ do label ! A.for "rate1" $ fromTo nic2 nic1
+                         H.select ! name "new_rate1"  ! ralign $ rates rate1
+                         label " Delay: "
+                         H.select ! name "new_delay1" ! ralign $ delays delay1
+                H.p $ input ! type_ "submit" ! value "Apply"
+            textarea "brctl show:" lsBr "5"
+            textarea "tc qdisc:"   lsTc "12"
   where
     rates def  = do toOpt def   "32kbit"
                     toOpt def   "64kbit"
